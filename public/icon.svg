@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <defs>
+    <linearGradient id="goldFrame" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fffbeb" />
+      <stop offset="20%" stop-color="#fde047" />
+      <stop offset="45%" stop-color="#eab308" />
+      <stop offset="70%" stop-color="#ca8a04" />
+      <stop offset="90%" stop-color="#fef08a" />
+      <stop offset="100%" stop-color="#854d0e" />
+    </linearGradient>
+    <radialGradient id="navyBg" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="55%" stop-color="#07193f" />
+      <stop offset="100%" stop-color="#020817" />
+    </radialGradient>
+    <linearGradient id="goldText" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="18%" stop-color="#fef08a" />
+      <stop offset="50%" stop-color="#facc15" />
+      <stop offset="85%" stop-color="#ca8a04" />
+      <stop offset="100%" stop-color="#fde047" />
+    </linearGradient>
+    <linearGradient id="whiteText" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="65%" stop-color="#f1f5f9" />
+      <stop offset="100%" stop-color="#cbd5e1" />
+    </linearGradient>
+    <linearGradient id="redPlus" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff4d4d" />
+      <stop offset="50%" stop-color="#dc2626" />
+      <stop offset="100%" stop-color="#991b1b" />
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="476" height="476" rx="95" fill="url(#goldFrame)" stroke="#713f12" stroke-width="6" />
+  <rect x="34" y="34" width="432" height="432" rx="76" fill="url(#navyBg)" stroke="#fef08a" stroke-width="3" />
+  <g transform="rotate(-5, 240, 195)">
+    <text x="225" y="215" font-family="sans-serif" font-weight="900" font-size="145" fill="#78350f" stroke="#451a03" stroke-width="14" text-anchor="middle">หวย</text>
+    <text x="225" y="204" font-family="sans-serif" font-weight="900" font-size="145" fill="url(#goldText)" stroke="#fef08a" stroke-width="3" text-anchor="middle">หวย</text>
+  </g>
+  <g transform="translate(405, 250) rotate(4)">
+    <path d="M -20 -52 L 20 -52 L 20 -20 L 52 -20 L 52 20 L 20 20 L 20 52 L -20 52 L -20 20 L -52 20 L -52 -20 L -20 -20 Z" fill="url(#redPlus)" stroke="url(#goldFrame)" stroke-width="7" stroke-linejoin="round" />
+  </g>
+  <g transform="rotate(-4, 240, 330)">
+    <text x="225" y="345" font-family="sans-serif" font-weight="900" font-size="120" fill="#1e3a8a" stroke="#09152b" stroke-width="14" text-anchor="middle">พลัส</text>
+    <text x="225" y="335" font-family="sans-serif" font-weight="900" font-size="120" fill="url(#whiteText)" stroke="#ffffff" stroke-width="2" text-anchor="middle">พลัส</text>
+  </g>
+</svg>

@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Kanit', sans-serif;
+  --color-line: #06C755;
+  --color-line-dark: #05a546;
+  --color-line-light: #e6f9ed;
+  --color-line-bg: #f0f4f8;
+  --color-huay-navy: #061a40;
+  --color-huay-blue: #0a2463;
+  --color-huay-gold: #f59e0b;
+  --color-huay-goldlight: #fde047;
+}
+
+body {
+  font-family: 'Kanit', sans-serif;
+  background-color: #eef2f6;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.number-card {
+  transition: transform 0.14s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.14s ease, box-shadow 0.14s ease;
+  font-variant-numeric: tabular-nums;
+}
+
+.number-card:active {
+  transform: scale(0.92);
+}
+
+.header-gradient {
+  background: linear-gradient(135deg, #041230 0%, #0a2558 55%, #063970 100%);
+  border-bottom: 3px solid #eab308;
+}
+
+.gold-border-glow {
+  box-shadow: 0 0 0 2px #facc15, 0 4px 12px rgba(234, 179, 8, 0.35);
+}
+
+.booked-card-gradient {
+  background: linear-gradient(145deg, #06C755 0%, #049f41 100%);
+}
+
+.pending-card-gradient {
+  background: linear-gradient(145deg, #fde047 0%, #facc15 55%, #eab308 100%);
+}
+
+.paid-card-gradient {
+  background: linear-gradient(145deg, #38bdf8 0%, #0ea5e9 50%, #0284c7 100%);
+}

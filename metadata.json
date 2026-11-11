@@ -1,0 +1,6 @@
+{
+  "name": "หวยพลัส+ ระบบจองหมายเลข 00 - 99",
+  "description": "ระบบแผงจองตัวเลข 00-99 ออนไลน์ พร้อมสร้างรูปภาพตารางแผง 00-99 และส่งข้อความตารางเลขเข้าแชท LINE ทันที",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
