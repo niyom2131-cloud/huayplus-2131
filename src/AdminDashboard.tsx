@@ -166,11 +166,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     // รายจ่ายรางวัลเฉพาะกรณีมีผู้จองเลขที่ถูกรางวัล
     const actualTopPayout = topWinnerBooking ? topPrizeUnit : 0;
     const actualBottomPayout = bottomWinnerBooking ? bottomPrizeUnit : 0;
+    const totalPrizePayout = actualTopPayout + actualBottomPayout;
     const extraExpense = Number(draw.extraExpenseAmount) || 0;
 
-    const totalExpense = actualTopPayout + actualBottomPayout + extraExpense;
+    const totalExpense = totalPrizePayout + extraExpense;
     const netProfitFromPaid = paidRevenue - totalExpense;
     const netProfitIfAllPaid = totalExpectedRevenue - totalExpense;
+
+    // สรุปรายชื่อคนที่ถูกรางวัลพร้อมรายรับรางวัลที่ได้ (รวมกรณีคนเดียวกันถูกทั้งบนและล่าง)
+    const winnerMap: Record<
+      string,
+      {
+        name: string;
+        rewards: {
+          label: string;
+          number: string;
+          prize: number;
+          bookingStatus: 'pending' | 'paid';
+          prizePaid: boolean;
+          slot: 'top' | 'bottom';
+        }[];
+        totalPrizeReceived: number;
+      }
+    > = {};
+
+    if (draw.winningTop.length === 2 && topWinnerBooking) {
+      const name = topWinnerBooking.name;
+      if (!winnerMap[name]) {
+        winnerMap[name] = { name, rewards: [], totalPrizeReceived: 0 };
+      }
+      winnerMap[name].rewards.push({
+        label: 'เลขท้าย 2 ตัวบน',
+        number: draw.winningTop,
+        prize: actualTopPayout,
+        bookingStatus: topWinnerBooking.status,
+        prizePaid: draw.topPrizePaid,
+        slot: 'top',
+      });
+      winnerMap[name].totalPrizeReceived += actualTopPayout;
+    }
+
+    if (draw.winningBottom.length === 2 && bottomWinnerBooking) {
+      const name = bottomWinnerBooking.name;
+      if (!winnerMap[name]) {
+        winnerMap[name] = { name, rewards: [], totalPrizeReceived: 0 };
+      }
+      winnerMap[name].rewards.push({
+        label: 'เลขท้าย 2 ตัวล่าง',
+        number: draw.winningBottom,
+        prize: actualBottomPayout,
+        bookingStatus: bottomWinnerBooking.status,
+        prizePaid: draw.bottomPrizePaid,
+        slot: 'bottom',
+      });
+      winnerMap[name].totalPrizeReceived += actualBottomPayout;
+    }
+
+    const winnersByPerson = Object.values(winnerMap).sort(
+      (a, b) => b.totalPrizeReceived - a.totalPrizeReceived
+    );
 
     return {
       keys,
@@ -196,6 +250,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       bottomWinnerBooking,
       actualTopPayout,
       actualBottomPayout,
+      totalPrizePayout,
+      winnersByPerson,
       extraExpense,
       totalExpense,
       netProfitFromPaid,
@@ -411,7 +467,68 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     wsUnpaid['!cols'] = [{ wch: 8 }, { wch: 12 }, { wch: 26 }, { wch: 18 }, { wch: 24 }, { wch: 24 }];
     XLSX.utils.book_append_sheet(wb, wsUnpaid, '3_รายการค้างจ่าย');
 
-    // Sheet 4: ตารางหมายเลข 00-99 ทั้งหมด
+    // Sheet 4: สรุปผู้ถูกรางวัลพร้อมรายรับรางวัลที่ได้
+    const winnerRows: (string | number)[][] = [
+      [`สรุปผลเลขที่ออกและผู้ถูกรางวัล (${periodLabel})`],
+      [],
+      ['ประเภทรางวัล', 'เลขที่ออก', 'ชื่อผู้ถูกรางวัล', 'สถานะค่าสลาก', 'รายรับรางวัลที่ได้ (บาท)', 'สถานะการโอนรางวัล'],
+      [
+        'เลขท้าย 2 ตัวบน',
+        draw.winningTop || 'ยังไม่ระบุ',
+        metrics.topWinnerBooking ? metrics.topWinnerBooking.name : 'ไม่มีผู้ถูก (เลขว่าง)',
+        metrics.topWinnerBooking
+          ? metrics.topWinnerBooking.status === 'paid'
+            ? 'โอนแล้ว (สีฟ้า)'
+            : 'รอโอน (สีเหลือง)'
+          : '-',
+        metrics.actualTopPayout,
+        metrics.topWinnerBooking ? (draw.topPrizePaid ? 'โอนรางวัลแล้ว' : 'รอโอนรางวัล') : '-',
+      ],
+      [
+        'เลขท้าย 2 ตัวล่าง',
+        draw.winningBottom || 'ยังไม่ระบุ',
+        metrics.bottomWinnerBooking ? metrics.bottomWinnerBooking.name : 'ไม่มีผู้ถูก (เลขว่าง)',
+        metrics.bottomWinnerBooking
+          ? metrics.bottomWinnerBooking.status === 'paid'
+            ? 'โอนแล้ว (สีฟ้า)'
+            : 'รอโอน (สีเหลือง)'
+          : '-',
+        metrics.actualBottomPayout,
+        metrics.bottomWinnerBooking
+          ? draw.bottomPrizePaid
+            ? 'โอนรางวัลแล้ว'
+            : 'รอโอนรางวัล'
+          : '-',
+      ],
+      ['รวมเงินรางวัลที่ได้รับทั้งสิ้น', '', '', '', metrics.totalPrizePayout, ''],
+      [],
+      ['สรุปรายชื่อผู้ถูกรางวัลและรายรับรางวัลรวมรายบุคคล'],
+      ['ลำดับ', 'ชื่อผู้ถูกรางวัล', 'รางวัลที่ถูก', 'รวมรายรับรางวัลที่ได้ (บาท)'],
+    ];
+    if (metrics.winnersByPerson.length === 0) {
+      winnerRows.push(['-', 'ไม่มีผู้ถูกรางวัลในงวดนี้', '-', 0]);
+    } else {
+      metrics.winnersByPerson.forEach((w, idx) => {
+        winnerRows.push([
+          idx + 1,
+          w.name,
+          w.rewards.map((r) => `${r.label} (เลข ${r.number})`).join(' + '),
+          w.totalPrizeReceived,
+        ]);
+      });
+    }
+    const wsWinners = XLSX.utils.aoa_to_sheet(winnerRows);
+    wsWinners['!cols'] = [
+      { wch: 22 },
+      { wch: 24 },
+      { wch: 30 },
+      { wch: 22 },
+      { wch: 24 },
+      { wch: 22 },
+    ];
+    XLSX.utils.book_append_sheet(wb, wsWinners, '4_สรุปผู้ถูกรางวัล');
+
+    // Sheet 5: ตารางหมายเลข 00-99 ทั้งหมด
     const allRows: (string | number)[][] = [
       [`ตารางหมายเลข 00-99 ทั้งหมด (${periodLabel})`],
       ['หมายเลข', 'สถานะ', 'ชื่อผู้จอง', 'ยอดเงิน (บาท)', 'ผลการถูกรางวัล', 'หมายเหตุ'],
@@ -437,7 +554,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
     const wsAll = XLSX.utils.aoa_to_sheet(allRows);
     wsAll['!cols'] = [{ wch: 12 }, { wch: 18 }, { wch: 26 }, { wch: 15 }, { wch: 28 }, { wch: 22 }];
-    XLSX.utils.book_append_sheet(wb, wsAll, '4_ตารางเลข00-99');
+    XLSX.utils.book_append_sheet(wb, wsAll, '5_ตารางเลข00-99');
 
     return wb;
   };
@@ -587,6 +704,61 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleCopyWinnerSummaryToLine = async () => {
+    const lines: string[] = [];
+    lines.push(`🏆 ประกาศผลรางวัล หวยพลัส+ สลากการกุศล นนส.ขส. 2131`);
+    lines.push(`🗓️ ประจำ${periodLabel}`);
+    lines.push(`━━━━━━━━━━━━━━`);
+    lines.push(`🎯 เลขที่ออกประจำงวด:`);
+    lines.push(`• เลขท้าย 2 ตัวบน : [ ${draw.winningTop || '--'} ]`);
+    lines.push(`• เลขท้าย 2 ตัวล่าง : [ ${draw.winningBottom || '--'} ]`);
+    lines.push(`━━━━━━━━━━━━━━`);
+    lines.push(`🎉 สรุปผู้ถูกรางวัลและรายรับรางวัลที่ได้:`);
+
+    if (draw.winningTop.length === 2) {
+      if (metrics.topWinnerBooking) {
+        lines.push(
+          `🥇 รางวัล 2 ตัวบน (เลข ${draw.winningTop}) : คุณ ${metrics.topWinnerBooking.name} — รับเงินรางวัล ${metrics.actualTopPayout.toLocaleString()} บาท`
+        );
+      } else {
+        lines.push(`• รางวัล 2 ตัวบน (เลข ${draw.winningTop}) : ไม่มีผู้ถูก (เลขว่าง)`);
+      }
+    } else {
+      lines.push(`• รางวัล 2 ตัวบน : รอระบุเลขที่ออก`);
+    }
+
+    if (draw.winningBottom.length === 2) {
+      if (metrics.bottomWinnerBooking) {
+        lines.push(
+          `🥇 รางวัล 2 ตัวล่าง (เลข ${draw.winningBottom}) : คุณ ${metrics.bottomWinnerBooking.name} — รับเงินรางวัล ${metrics.actualBottomPayout.toLocaleString()} บาท`
+        );
+      } else {
+        lines.push(`• รางวัล 2 ตัวล่าง (เลข ${draw.winningBottom}) : ไม่มีผู้ถูก (เลขว่าง)`);
+      }
+    } else {
+      lines.push(`• รางวัล 2 ตัวล่าง : รอระบุเลขที่ออก`);
+    }
+
+    if (metrics.winnersByPerson.length > 0) {
+      lines.push(`━━━━━━━━━━━━━━`);
+      lines.push(`💰 สรุปยอดเงินรางวัลที่ได้รับรายบุคคล:`);
+      metrics.winnersByPerson.forEach((w, idx) => {
+        const detail = w.rewards.map((r) => `${r.label} เลข ${r.number}`).join(' + ');
+        lines.push(
+          `${idx + 1}. คุณ ${w.name} (${detail}) = รับรางวัลรวม ${w.totalPrizeReceived.toLocaleString()} บาท`
+        );
+      });
+      lines.push(`รวมจ่ายเงินรางวัลทั้งสิ้น: ${metrics.totalPrizePayout.toLocaleString()} บาท`);
+    }
+
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      onShowToast('คัดลอกสรุปผลเลขที่ออกและผู้ถูกรางวัลแล้ว! วางใน LINE ได้เลย');
+    } catch {
+      onShowToast('คัดลอกสรุปผู้ถูกรางวัลสำเร็จ');
+    }
+  };
+
   const day01Summary = daySlot === '01' ? metrics : otherSlotMetrics;
   const day16Summary = daySlot === '16' ? metrics : otherSlotMetrics;
 
@@ -720,6 +892,345 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }`}
             ></i>
           </button>
+        </div>
+      </div>
+
+      {/* ================================================================================= */}
+      {/* ช่องเลขที่ออกประจำงวด (บน / ล่าง) & สรุปคนที่ถูกรางวัลพร้อมรายรับรางวัลที่ได้              */}
+      {/* ================================================================================= */}
+      <div className="bg-gradient-to-br from-huay-navy via-[#0a2254] to-slate-900 text-white rounded-3xl p-4 sm:p-5 shadow-lg border-2 border-amber-400">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3.5 border-b border-white/15">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center text-xl font-black shrink-0 shadow-md">
+              <i className="fa-solid fa-trophy"></i>
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-extrabold text-base sm:text-lg text-amber-300">
+                  บันทึกเลขที่ออกประจำงวด (บน - ล่าง) & สรุปผู้ถูกรางวัลพร้อมรายรับรางวัลที่ได้
+                </h2>
+                <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-white/15 text-amber-200 border border-amber-300/30">
+                  {periodLabel}
+                </span>
+              </div>
+              <p className="text-xs text-slate-200 mt-0.5">
+                กรอกเลข 2 ตัวบน และ 2 ตัวล่างที่ออกในงวดนี้ ระบบจะดึงชื่อผู้ถูกรางวัลและคำนวณรายรับเงินรางวัลที่ได้ให้อัตโนมัติทันที
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleCopyWinnerSummaryToLine}
+              className="bg-line hover:bg-line-dark text-white font-extrabold py-2 px-3.5 rounded-xl text-xs shadow-md border border-green-300/40 transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            >
+              <i className="fa-brands fa-line text-base"></i>
+              <span>คัดลอกประกาศผู้ถูกรางวัลส่ง LINE</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-4 items-stretch">
+          {/* Left 5 Cols: ช่องกรอกเลขที่ออกประจำงวด บน / ล่าง */}
+          <div className="lg:col-span-5 bg-white/10 backdrop-blur-xs rounded-2xl p-4 border border-white/15 flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-amber-300 uppercase tracking-wider">
+                <i className="fa-solid fa-bullseye mr-1.5"></i>
+                ช่องกรอกเลขที่ออกประจำงวด
+              </span>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-200 border border-amber-300/30">
+                อัตราจ่าย: {metrics.autoPrizePerWinner.toLocaleString()} บ./รางวัล
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* ช่องกรอก 2 ตัวบน */}
+              <div className="bg-slate-950/65 rounded-2xl p-3 border border-amber-400/50 text-center space-y-1.5">
+                <label className="block text-xs font-extrabold text-amber-300">
+                  เลขที่ออก 2 ตัวบน
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={draw.winningTop}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                    onUpdateDrawRecord({ ...draw, winningTop: val });
+                  }}
+                  placeholder="--"
+                  className="w-full text-center py-2 bg-white text-slate-950 rounded-xl text-3xl sm:text-4xl font-black tracking-widest tabular-nums border-2 border-amber-400 focus:border-sky-400 outline-none shadow-inner"
+                />
+                <p className="text-[11px] text-slate-300 font-semibold">
+                  รางวัลบน:{' '}
+                  <strong className="text-amber-300">
+                    {metrics.topPrizeUnit.toLocaleString()} บ.
+                  </strong>
+                </p>
+              </div>
+
+              {/* ช่องกรอก 2 ตัวล่าง */}
+              <div className="bg-slate-950/65 rounded-2xl p-3 border border-sky-400/50 text-center space-y-1.5">
+                <label className="block text-xs font-extrabold text-sky-300">
+                  เลขที่ออก 2 ตัวล่าง
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={draw.winningBottom}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                    onUpdateDrawRecord({ ...draw, winningBottom: val });
+                  }}
+                  placeholder="--"
+                  className="w-full text-center py-2 bg-white text-slate-950 rounded-xl text-3xl sm:text-4xl font-black tracking-widest tabular-nums border-2 border-sky-400 focus:border-amber-400 outline-none shadow-inner"
+                />
+                <p className="text-[11px] text-slate-300 font-semibold">
+                  รางวัลล่าง:{' '}
+                  <strong className="text-sky-300">
+                    {metrics.bottomPrizeUnit.toLocaleString()} บ.
+                  </strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-slate-300 pt-1 border-t border-white/10">
+              <span>
+                ยอดจองในงวดนี้: <strong className="text-white">{metrics.totalBookedCount} เลข</strong>
+                {metrics.totalBookedCount < 60 && draw.useProportionalRule
+                  ? ' (คิดตามสัดส่วน เลขละ 50 บ.)'
+                  : ' (จ่ายเต็ม 3,000 บ.)'}
+              </span>
+              {(draw.winningTop || draw.winningBottom) && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateDrawRecord({
+                      ...draw,
+                      winningTop: '',
+                      winningBottom: '',
+                      topPrizePaid: false,
+                      bottomPrizePaid: false,
+                    })
+                  }
+                  className="text-rose-300 hover:text-rose-200 font-bold underline cursor-pointer"
+                >
+                  ล้างเลขที่ออก
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Right 7 Cols: สรุปคนที่ถูกรางวัลพร้อมรายรับรางวัลที่ได้ */}
+          <div className="lg:col-span-7 bg-white text-slate-800 rounded-2xl p-4 shadow-md flex flex-col justify-between space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">
+                  <i className="fa-solid fa-award"></i>
+                </span>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-slate-900">
+                    สรุปคนที่ถูกรางวัล & รายรับรางวัลที่ได้
+                  </h3>
+                </div>
+              </div>
+              <span className="text-xs font-black px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 tabular-nums">
+                รวมเงินรางวัลที่ได้รับทั้งสิ้น: {metrics.totalPrizePayout.toLocaleString()} บาท
+              </span>
+            </div>
+
+            {/* ตารางแสดงผลผู้ถูกรางวัล บน และ ล่าง */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* การ์ดสรุปผู้ถูกรางวัล 2 ตัวบน */}
+              <div
+                className={`rounded-2xl p-3 border-2 transition ${
+                  draw.winningTop.length === 2 && metrics.topWinnerBooking
+                    ? 'bg-amber-50/70 border-amber-400'
+                    : 'bg-slate-50 border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-extrabold text-slate-700">
+                    รางวัลเลขท้าย 2 ตัวบน
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-lg bg-huay-navy text-amber-300 font-black text-sm tabular-nums">
+                    เลข {draw.winningTop.length === 2 ? draw.winningTop : '--'}
+                  </span>
+                </div>
+
+                {draw.winningTop.length === 2 ? (
+                  metrics.topWinnerBooking ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[11px] text-slate-500 font-semibold">ผู้ถูกรางวัล:</span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            metrics.topWinnerBooking.status === 'paid'
+                              ? 'bg-sky-500 text-white'
+                              : 'bg-yellow-400 text-slate-900'
+                          }`}
+                        >
+                          {metrics.topWinnerBooking.status === 'paid'
+                            ? 'ค่าสลาก: โอนแล้ว'
+                            : 'ค่าสลาก: รอโอน'}
+                        </span>
+                      </div>
+                      <p className="text-base font-black text-slate-900 truncate">
+                        <i className="fa-solid fa-user-check text-emerald-600 mr-1.5"></i>
+                        {metrics.topWinnerBooking.name}
+                      </p>
+                      <div className="pt-1.5 border-t border-amber-200/80 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-500">รายรับรางวัลที่ได้</p>
+                          <p className="text-lg font-black text-emerald-600 tabular-nums">
+                            +{metrics.actualTopPayout.toLocaleString()} บาท
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onUpdateDrawRecord({ ...draw, topPrizePaid: !draw.topPrizePaid })
+                          }
+                          className={`text-[11px] font-extrabold px-2.5 py-1.5 rounded-xl border transition cursor-pointer whitespace-nowrap ${
+                            draw.topPrizePaid
+                              ? 'bg-emerald-600 text-white border-emerald-700'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                          }`}
+                        >
+                          {draw.topPrizePaid ? '✓ โอนรางวัลแล้ว' : 'กดเมื่อโอนรางวัล'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-3 text-center">
+                      <p className="text-xs font-bold text-slate-600">
+                        เลข {draw.winningTop} ไม่มีคนจอง (เลขว่าง)
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        ไม่มีผู้ถูกรางวัล · รายรับรางวัล = 0 บาท
+                      </p>
+                    </div>
+                  )
+                ) : (
+                  <div className="py-3 text-center text-xs text-slate-400">
+                    รอระบุเลขท้าย 2 ตัวบน (00-99)
+                  </div>
+                )}
+              </div>
+
+              {/* การ์ดสรุปผู้ถูกรางวัล 2 ตัวล่าง */}
+              <div
+                className={`rounded-2xl p-3 border-2 transition ${
+                  draw.winningBottom.length === 2 && metrics.bottomWinnerBooking
+                    ? 'bg-sky-50/70 border-sky-400'
+                    : 'bg-slate-50 border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-extrabold text-slate-700">
+                    รางวัลเลขท้าย 2 ตัวล่าง
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-lg bg-sky-600 text-white font-black text-sm tabular-nums">
+                    เลข {draw.winningBottom.length === 2 ? draw.winningBottom : '--'}
+                  </span>
+                </div>
+
+                {draw.winningBottom.length === 2 ? (
+                  metrics.bottomWinnerBooking ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[11px] text-slate-500 font-semibold">ผู้ถูกรางวัล:</span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            metrics.bottomWinnerBooking.status === 'paid'
+                              ? 'bg-sky-500 text-white'
+                              : 'bg-yellow-400 text-slate-900'
+                          }`}
+                        >
+                          {metrics.bottomWinnerBooking.status === 'paid'
+                            ? 'ค่าสลาก: โอนแล้ว'
+                            : 'ค่าสลาก: รอโอน'}
+                        </span>
+                      </div>
+                      <p className="text-base font-black text-slate-900 truncate">
+                        <i className="fa-solid fa-user-check text-emerald-600 mr-1.5"></i>
+                        {metrics.bottomWinnerBooking.name}
+                      </p>
+                      <div className="pt-1.5 border-t border-sky-200/80 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-500">รายรับรางวัลที่ได้</p>
+                          <p className="text-lg font-black text-emerald-600 tabular-nums">
+                            +{metrics.actualBottomPayout.toLocaleString()} บาท
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onUpdateDrawRecord({
+                              ...draw,
+                              bottomPrizePaid: !draw.bottomPrizePaid,
+                            })
+                          }
+                          className={`text-[11px] font-extrabold px-2.5 py-1.5 rounded-xl border transition cursor-pointer whitespace-nowrap ${
+                            draw.bottomPrizePaid
+                              ? 'bg-emerald-600 text-white border-emerald-700'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                          }`}
+                        >
+                          {draw.bottomPrizePaid ? '✓ โอนรางวัลแล้ว' : 'กดเมื่อโอนรางวัล'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-3 text-center">
+                      <p className="text-xs font-bold text-slate-600">
+                        เลข {draw.winningBottom} ไม่มีคนจอง (เลขว่าง)
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        ไม่มีผู้ถูกรางวัล · รายรับรางวัล = 0 บาท
+                      </p>
+                    </div>
+                  )
+                ) : (
+                  <div className="py-3 text-center text-xs text-slate-400">
+                    รอระบุเลขท้าย 2 ตัวล่าง (00-99)
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* สรุปรายชื่อผู้โชคดีและยอดเงินรางวัลที่ได้รับสุทธิรายบุคคล */}
+            {metrics.winnersByPerson.length > 0 && (
+              <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl p-3 space-y-1.5">
+                <p className="text-xs font-extrabold text-emerald-950">
+                  <i className="fa-solid fa-sack-dollar mr-1.5 text-emerald-600"></i>
+                  สรุปยอดรายรับเงินรางวัลของผู้ถูกรางวัลประจำงวด ({metrics.winnersByPerson.length} ท่าน):
+                </p>
+                <div className="divide-y divide-emerald-200/70">
+                  {metrics.winnersByPerson.map((winner, idx) => (
+                    <div
+                      key={winner.name}
+                      className="py-1.5 first:pt-0 last:pb-0 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm"
+                    >
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-black text-slate-900">
+                          {idx + 1}. คุณ {winner.name}
+                        </span>
+                        <span className="text-xs font-bold text-emerald-800 bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+                          ถูก {winner.rewards.map((r) => `${r.label} (${r.number})`).join(' + ')}
+                        </span>
+                      </div>
+                      <span className="font-black text-emerald-700 text-sm sm:text-base tabular-nums">
+                        รับเงินรางวัล +{winner.totalPrizeReceived.toLocaleString()} บาท
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
